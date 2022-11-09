@@ -1,2 +1,2 @@
-#define SECRET_SSID ""
-#define SECRET_PASS ""
+#define SECRET_SSID "Sumaia"
+#define SECRET_PASS "24312431"

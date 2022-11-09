@@ -22,7 +22,7 @@ char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as k
 int status = WL_IDLE_STATUS;     // the WiFi radio's status
 
 // Specify IP address or hostname
-String hostName = "www.google.com";
+String hostName = "8.8.8.8";
 int pingResult;
 
 void setup() {
