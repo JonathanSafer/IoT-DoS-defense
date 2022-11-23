@@ -2,12 +2,8 @@
 A demonstration of DoS defense methods for IoT
 
 ## Hardware
-- Arduino Vidor MKR 4000
+- Raspberry Pi Pico W
 - MPL 3115A2 Altitude Sensor
-
-## Libraries
-- WifiNINA v1.8.0
-- VidorPeripherals v1.1.0
 
 ## Base System
 - Personal computer will act as a simple webserver

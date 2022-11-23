@@ -1,135 +1,151 @@
 /*
-  This example connects to an encrypted WiFi network (WPA/WPA2).
-  Then it prints the MAC address of the board,
-  the IP address obtained, and other network details.
-  Then it continuously pings given host specified by IP Address or name.
+   Copyright (c) 2015, Majenko Technologies
+   All rights reserved.
 
-  Circuit:
-  * Board with NINA module (Arduino MKR WiFi 1010, MKR VIDOR 4000 and UNO WiFi Rev.2)
+   Redistribution and use in source and binary forms, with or without modification,
+   are permitted provided that the following conditions are met:
 
-  created 13 July 2010
-  by dlf (Metodo2 srl)
-  modified 09 June 2016
-  by Petar Georgiev
+ * * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+ * * Redistributions in binary form must reproduce the above copyright notice, this
+     list of conditions and the following disclaimer in the documentation and/or
+     other materials provided with the distribution.
+
+ * * Neither the name of Majenko Technologies nor the names of its
+     contributors may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <SPI.h>
-#include <WiFiNINA.h>
 
-#include "arduino_secrets.h" 
-///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = SECRET_SSID;        // your network SSID (name)
-char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
-int status = WL_IDLE_STATUS;     // the WiFi radio's status
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <LEAmDNS.h>
+#include "arduino_secrets.h"
 
-// Specify IP address or hostname
-String hostName = "8.8.8.8";
-int pingResult;
+const char *ssid = STASSID;
+const char *password = STAPSK;
 
-void setup() {
-  // Initialize serial and wait for port to open:
-  Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
+WebServer server(80);
 
-  // check for the WiFi module:
-  if (WiFi.status() == WL_NO_MODULE) {
-    Serial.println("Communication with WiFi module failed!");
-    // don't continue
-    while (true);
-  }
+const int led = LED_BUILTIN;
 
-  String fv = WiFi.firmwareVersion();
-  if (fv < WIFI_FIRMWARE_LATEST_VERSION) {
-    Serial.println("Please upgrade the firmware");
-  }
+void handleRoot() {
+  static int cnt = 0;
+  digitalWrite(led, 1);
+  char temp[400];
+  int sec = millis() / 1000;
+  int min = sec / 60;
+  int hr = min / 60;
 
-  // attempt to connect to WiFi network:
-  while ( status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to WPA SSID: ");
-    Serial.println(ssid);
-    // Connect to WPA/WPA2 network:
-    status = WiFi.begin(ssid, pass);
+  snprintf(temp, 400,
 
-    // wait 5 seconds for connection:
-    delay(5000);
-  }
+           "<html>\
+  <head>\
+    <meta http-equiv='refresh' content='.5'/>\
+    <title>Pico-W Demo</title>\
+    <style>\
+      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
+    </style>\
+  </head>\
+  <body>\
+    <h1>Hello from the Pico W!</h1>\
+    <p>Uptime: %02d:%02d:%02d</p>\
+    <p>Free Memory: %d</p>\
+    <p>Page Count: %d</p>\
+    <img src=\"/test.svg\" />\
+  </body>\
+</html>",
 
-  // you're connected now, so print out the data:
-  Serial.println("You're connected to the network");
-  printCurrentNet();
-  printWiFiData();
+           hr, min % 60, sec % 60, rp2040.getFreeHeap(), ++cnt);
+  server.send(200, "text/html", temp);
+  digitalWrite(led, 0);
 }
 
-void loop() {
-  Serial.print("Pinging ");
-  Serial.print(hostName);
-  Serial.print(": ");
+void handleNotFound() {
+  digitalWrite(led, 1);
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
 
-  pingResult = WiFi.ping(hostName);
-
-  if (pingResult >= 0) {
-    Serial.print("SUCCESS! RTT = ");
-    Serial.print(pingResult);
-    Serial.println(" ms");
-  } else {
-    Serial.print("FAILED! Error code: ");
-    Serial.println(pingResult);
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
   }
 
-  delay(5000);
+  server.send(404, "text/plain", message);
+  digitalWrite(led, 0);
 }
 
-void printWiFiData() {
-  // print your board's IP address:
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP address : ");
-  Serial.println(ip);
-
-  Serial.print("Subnet mask: ");
-  Serial.println((IPAddress)WiFi.subnetMask());
-
-  Serial.print("Gateway IP : ");
-  Serial.println((IPAddress)WiFi.gatewayIP());
-
-  // print your MAC address:
-  byte mac[6];
-  WiFi.macAddress(mac);
-  Serial.print("MAC address: ");
-  printMacAddress(mac);
-}
-
-void printCurrentNet() {
-  // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // print the MAC address of the router you're attached to:
-  byte bssid[6];
-  WiFi.BSSID(bssid);
-  Serial.print("BSSID: ");
-  printMacAddress(bssid);
-  // print the received signal strength:
-  long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI): ");
-  Serial.println(rssi);
-
-  // print the encryption type:
-  byte encryption = WiFi.encryptionType();
-  Serial.print("Encryption Type: ");
-  Serial.println(encryption, HEX);
-  Serial.println();
-}
-
-void printMacAddress(byte mac[]) {
-  for (int i = 5; i >= 0; i--) {
-    if (mac[i] < 16) {
-      Serial.print("0");
-    }
-    Serial.print(mac[i], HEX);
-    if (i > 0) {
-      Serial.print(":");
-    }
+void drawGraph() {
+  String out;
+  out.reserve(2600);
+  char temp[70];
+  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"400\" height=\"150\">\n";
+  out += "<rect width=\"400\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"1\" stroke=\"rgb(0, 0, 0)\" />\n";
+  out += "<g stroke=\"black\">\n";
+  int y = rand() % 130;
+  for (int x = 10; x < 390; x += 10) {
+    int y2 = rand() % 130;
+    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"1\" />\n", x, 140 - y, x + 10, 140 - y2);
+    out += temp;
+    y = y2;
   }
-  Serial.println();
+  out += "</g>\n</svg>\n";
+
+  server.send(200, "image/svg+xml", out);
+}
+
+void setup(void) {
+  pinMode(led, OUTPUT);
+  digitalWrite(led, 0);
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  if (MDNS.begin("picow")) {
+    Serial.println("MDNS responder started");
+  }
+
+  server.on("/", handleRoot);
+  server.on("/test.svg", drawGraph);
+  server.on("/inline", []() {
+    server.send(200, "text/plain", "this works as well");
+  });
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop(void) {
+  server.handleClient();
+  MDNS.update();
 }
